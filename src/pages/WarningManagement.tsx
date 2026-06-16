@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useKayakStore } from '@/store/useKayakStore'
-import { AlertTriangle, Droplets, Cloud, ShieldAlert, CheckCircle, XCircle, Plus } from 'lucide-react'
-import type { WarningType, WarningSeverity } from '@/types'
+import { AlertTriangle, Droplets, Cloud, ShieldAlert, CheckCircle, XCircle, Plus, ShieldCheck, Waves, Info, ChevronDown, ChevronUp } from 'lucide-react'
+import type { WarningType, WarningSeverity, WarningCourseEffect } from '@/types'
 
 const statusColors: Record<string, string> = {
   '正常': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -17,6 +17,20 @@ const statusIcons: Record<string, typeof Droplets> = {
   '停课': ShieldAlert,
 }
 
+const effectColors: Record<string, string> = {
+  '保留': 'bg-emerald-50 border-emerald-200 text-emerald-700',
+  '部分保留': 'bg-amber-50 border-amber-200 text-amber-700',
+  '待改期': 'bg-orange-50 border-orange-200 text-orange-700',
+  '停课': 'bg-red-50 border-red-200 text-red-700',
+}
+
+const effectIcons: Record<string, typeof ShieldCheck> = {
+  '保留': ShieldCheck,
+  '部分保留': Info,
+  '待改期': AlertTriangle,
+  '停课': XCircle,
+}
+
 export default function WarningManagement() {
   const { waterAreas, warnings, courses, bookings, students, coaches, issueWarning, resolveWarning } = useKayakStore()
   const [showIssueForm, setShowIssueForm] = useState(false)
@@ -24,6 +38,7 @@ export default function WarningManagement() {
   const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([])
   const [severity, setSeverity] = useState<WarningSeverity>('中')
   const [message, setMessage] = useState('')
+  const [expandedWarning, setExpandedWarning] = useState<string | null>(null)
 
   const activeWarnings = warnings.filter(w => w.status === '生效中')
   const resolvedWarnings = warnings.filter(w => w.status === '已解除')
@@ -42,6 +57,16 @@ export default function WarningManagement() {
   }
 
   const getAffectedCourses = (areaId: string) => courses.filter(c => c.waterAreaId === areaId && (c.status === '正常' || c.status === '待改期'))
+
+  const countCourseEffects = (effects?: WarningCourseEffect[]) => {
+    if (!effects) return { keep: 0, partial: 0, reschedule: 0, cancel: 0 }
+    return {
+      keep: effects.filter(e => e.effect === '保留').length,
+      partial: effects.filter(e => e.effect === '部分保留').length,
+      reschedule: effects.filter(e => e.effect === '待改期').length,
+      cancel: effects.filter(e => e.effect === '停课').length,
+    }
+  }
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -65,7 +90,7 @@ export default function WarningManagement() {
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-2">预警类型</label>
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-wrap">
                 <button
                   onClick={() => setWarningType('水位预警')}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-lg border-2 text-sm font-medium transition-all ${
@@ -73,7 +98,7 @@ export default function WarningManagement() {
                   }`}
                 >
                   <Droplets className="w-4 h-4" />
-                  水位预警 (课程自动停课)
+                  水位预警（岸上课保留，水上课待改期）
                 </button>
                 <button
                   onClick={() => setWarningType('天气预警')}
@@ -82,14 +107,14 @@ export default function WarningManagement() {
                   }`}
                 >
                   <Cloud className="w-4 h-4" />
-                  天气预警 (课程待改期)
+                  天气预警（所有课程待改期）
                 </button>
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-600 mb-2">影响水域</label>
-              <div className="flex gap-3">
+              <div className="flex gap-3 flex-wrap">
                 {waterAreas.map(area => (
                   <button
                     key={area.id}
@@ -138,6 +163,21 @@ export default function WarningManagement() {
               />
             </div>
 
+            <div className="bg-amber-50 rounded-xl p-4 border border-amber-200">
+              <div className="flex items-start gap-2">
+                <Info className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                <div className="text-xs text-amber-700 space-y-1">
+                  <p className="font-medium">智能处理规则：</p>
+                  <ul className="list-disc list-inside space-y-0.5 ml-1">
+                    <li>水位预警时，<span className="font-medium">岸上安全课</span>将正常保留</li>
+                    <li>岸上课占比≥50%的组合课<span className="font-medium">部分保留</span>（水上部分待改期）</li>
+                    <li>纯水上实操课和体验营<span className="font-medium">全部待改期</span></li>
+                    <li>天气预警时<span className="font-medium">所有课程待改期</span></li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
             <div className="flex gap-3 justify-end">
               <button onClick={() => setShowIssueForm(false)} className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600">
                 取消
@@ -158,6 +198,8 @@ export default function WarningManagement() {
         {waterAreas.map(area => {
           const StatusIcon = statusIcons[area.status] || CheckCircle
           const affectedCourses = getAffectedCourses(area.id)
+          const activeWarning = activeWarnings.find(w => w.waterAreaIds.includes(area.id))
+          const courseCounts = countCourseEffects(activeWarning?.affectedCourses)
           return (
             <div key={area.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
               <div className={`px-5 py-4 border-b-2 ${area.status === '正常' ? 'border-emerald-300 bg-emerald-50' : area.status === '水位预警' ? 'border-red-300 bg-red-50' : area.status === '天气预警' ? 'border-amber-300 bg-amber-50' : 'border-slate-300 bg-slate-50'}`}>
@@ -169,9 +211,50 @@ export default function WarningManagement() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 mt-1">{area.description}</p>
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                  {area.allowedBoatTypes && area.allowedBoatTypes.length > 0 && (
+                    <span className="text-xs text-slate-400">艇型: {area.allowedBoatTypes.join('、')}</span>
+                  )}
+                  {area.allowChildren !== undefined && (
+                    <span className={`text-xs ${area.allowChildren ? 'text-emerald-600' : 'text-slate-400'}`}>
+                      {area.allowChildren ? '允许儿童' : '限成人'}
+                    </span>
+                  )}
+                </div>
               </div>
               <div className="p-4">
-                <p className="text-xs text-slate-400">受影响课程: <span className="font-medium text-slate-600">{affectedCourses.length}</span></p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-slate-400">受影响课程</p>
+                  <p className="text-sm font-bold text-slate-700">{affectedCourses.length}</p>
+                </div>
+                {activeWarning && activeWarning.affectedCourses && activeWarning.affectedCourses.length > 0 && (
+                  <div className="grid grid-cols-2 gap-2 mt-3">
+                    {courseCounts.keep > 0 && (
+                      <div className="flex items-center gap-1.5 bg-emerald-50 rounded-lg px-2 py-1.5">
+                        <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                        <span className="text-xs text-emerald-700">保留 {courseCounts.keep}</span>
+                      </div>
+                    )}
+                    {courseCounts.partial > 0 && (
+                      <div className="flex items-center gap-1.5 bg-amber-50 rounded-lg px-2 py-1.5">
+                        <Info className="w-3 h-3 text-amber-600" />
+                        <span className="text-xs text-amber-700">部分保留 {courseCounts.partial}</span>
+                      </div>
+                    )}
+                    {courseCounts.reschedule > 0 && (
+                      <div className="flex items-center gap-1.5 bg-orange-50 rounded-lg px-2 py-1.5">
+                        <AlertTriangle className="w-3 h-3 text-orange-600" />
+                        <span className="text-xs text-orange-700">待改期 {courseCounts.reschedule}</span>
+                      </div>
+                    )}
+                    {courseCounts.cancel > 0 && (
+                      <div className="flex items-center gap-1.5 bg-red-50 rounded-lg px-2 py-1.5">
+                        <XCircle className="w-3 h-3 text-red-600" />
+                        <span className="text-xs text-red-700">停课 {courseCounts.cancel}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )
@@ -179,8 +262,14 @@ export default function WarningManagement() {
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="px-6 py-4 border-b border-slate-100">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 className="text-base font-bold text-slate-800">预警记录</h2>
+          <div className="flex items-center gap-3 text-xs">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500"></span>保留</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500"></span>部分保留</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-500"></span>待改期</span>
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-500"></span>停课</span>
+          </div>
         </div>
         {activeWarnings.length === 0 && resolvedWarnings.length === 0 ? (
           <div className="p-8 text-center">
@@ -189,42 +278,132 @@ export default function WarningManagement() {
           </div>
         ) : (
           <div className="divide-y divide-slate-100">
-            {[...activeWarnings, ...resolvedWarnings].map(w => (
-              <div key={w.id} className={`px-6 py-4 ${w.status === '生效中' ? 'bg-red-50/50' : ''}`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    {w.type === '水位预警' ? (
-                      <Droplets className="w-5 h-5 text-red-500" />
-                    ) : (
-                      <Cloud className="w-5 h-5 text-amber-500" />
-                    )}
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-slate-800">{w.type}</span>
-                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                          w.severity === '高' ? 'bg-red-100 text-red-700' : w.severity === '中' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'
-                        }`}>{w.severity}</span>
-                        <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
-                          w.status === '生效中' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'
-                        }`}>{w.status}</span>
+            {[...activeWarnings, ...resolvedWarnings].map(w => {
+              const isExpanded = expandedWarning === w.id
+              const counts = countCourseEffects(w.affectedCourses)
+              return (
+                <div key={w.id} className={`${w.status === '生效中' ? 'bg-red-50/50' : ''}`}>
+                  <div className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {w.type === '水位预警' ? (
+                          <Droplets className="w-5 h-5 text-red-500" />
+                        ) : (
+                          <Cloud className="w-5 h-5 text-amber-500" />
+                        )}
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-slate-800">{w.type}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                              w.severity === '高' ? 'bg-red-100 text-red-700' : w.severity === '中' ? 'bg-amber-100 text-amber-700' : 'bg-sky-100 text-sky-700'
+                            }`}>{w.severity}</span>
+                            <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${
+                              w.status === '生效中' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500'
+                            }`}>{w.status}</span>
+                            {counts.keep > 0 && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-emerald-100 text-emerald-700">
+                                <ShieldCheck className="w-3 h-3" />保留 {counts.keep}
+                              </span>
+                            )}
+                            {counts.partial > 0 && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700">
+                                <Info className="w-3 h-3" />部分 {counts.partial}
+                              </span>
+                            )}
+                            {counts.reschedule > 0 && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700">
+                                <AlertTriangle className="w-3 h-3" />改期 {counts.reschedule}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 mt-0.5">{w.message}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            影响水域: {w.waterAreaIds.map(id => waterAreas.find(a => a.id === id)?.name).join('、')} · {w.createdAt.slice(0, 16).replace('T', ' ')}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-500 mt-0.5">{w.message}</p>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        影响水域: {w.waterAreaIds.map(id => waterAreas.find(a => a.id === id)?.name).join('、')} · {w.createdAt.slice(0, 16).replace('T', ' ')}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        {w.affectedCourses && w.affectedCourses.length > 0 && (
+                          <button
+                            onClick={() => setExpandedWarning(isExpanded ? null : w.id)}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-white/60 transition-colors"
+                          >
+                            {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          </button>
+                        )}
+                        {w.status === '生效中' && (
+                          <button
+                            onClick={() => resolveWarning(w.id)}
+                            className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-sm hover:bg-emerald-600 transition-colors"
+                          >
+                            解除预警
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                  {w.status === '生效中' && (
-                    <button
-                      onClick={() => resolveWarning(w.id)}
-                      className="px-3 py-1.5 rounded-lg bg-emerald-500 text-white text-sm hover:bg-emerald-600 transition-colors"
-                    >
-                      解除预警
-                    </button>
+
+                  {isExpanded && w.affectedCourses && w.affectedCourses.length > 0 && (
+                    <div className="px-6 pb-4">
+                      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                        <div className="grid grid-cols-6 gap-4 px-4 py-2 bg-slate-50 border-b border-slate-200 text-xs font-medium text-slate-500 uppercase tracking-wide">
+                          <div className="col-span-2">课程</div>
+                          <div>类型</div>
+                          <div>处理结果</div>
+                          <div className="col-span-2">原因</div>
+                        </div>
+                        <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+                          {w.affectedCourses.map((effect, i) => {
+                            const course = courses.find(c => c.id === effect.courseId)
+                            const coach = course ? coaches.find(c => c.id === course.coachId) : null
+                            const EffectIcon = effectIcons[effect.effect] || Info
+                            return (
+                              <div key={i} className="grid grid-cols-6 gap-4 px-4 py-3 items-center hover:bg-slate-50 transition-colors">
+                                <div className="col-span-2">
+                                  <p className="text-sm font-medium text-slate-700">{course?.date} {course?.startTime}-{course?.endTime}</p>
+                                  <p className="text-xs text-slate-400">教练: {coach?.name} · Lv.{course?.level}</p>
+                                </div>
+                                <div>
+                                  {course?.courseType === '岸上安全课' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-600">
+                                      <ShieldCheck className="w-3 h-3" />岸上安全课
+                                    </span>
+                                  )}
+                                  {course?.courseType === '水上实操课' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-sky-50 text-sky-600">
+                                      <Waves className="w-3 h-3" />水上实操课
+                                    </span>
+                                  )}
+                                  {course?.courseType === '体验营' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-violet-50 text-violet-600">
+                                      体验营
+                                    </span>
+                                  )}
+                                  {course?.courseType === '组合课' && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-600">
+                                      组合课 {course?.shoreLessonProportion}%岸上
+                                    </span>
+                                  )}
+                                </div>
+                                <div>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${effectColors[effect.effect]}`}>
+                                    <EffectIcon className="w-3 h-3" />
+                                    {effect.effect}
+                                  </span>
+                                </div>
+                                <div className="col-span-2">
+                                  <p className="text-xs text-slate-500">{effect.reason}</p>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
                   )}
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
