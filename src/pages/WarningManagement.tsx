@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useKayakStore } from '@/store/useKayakStore'
-import { AlertTriangle, Droplets, Cloud, ShieldAlert, CheckCircle, XCircle, Plus, ShieldCheck, Waves, Info, ChevronDown, ChevronUp } from 'lucide-react'
-import type { WarningType, WarningSeverity, WarningCourseEffect } from '@/types'
+import { AlertTriangle, Droplets, Cloud, ShieldAlert, CheckCircle, XCircle, Plus, ShieldCheck, Waves, Info, ChevronDown, ChevronUp, Users } from 'lucide-react'
+import type { WarningType, WarningSeverity, WarningCourseEffect, CourseStatus } from '@/types'
 
 const statusColors: Record<string, string> = {
   '正常': 'bg-emerald-100 text-emerald-700 border-emerald-200',
@@ -17,18 +17,41 @@ const statusIcons: Record<string, typeof Droplets> = {
   '停课': ShieldAlert,
 }
 
-const effectColors: Record<string, string> = {
+const effectDisplayColors: Record<string, string> = {
   '保留': 'bg-emerald-50 border-emerald-200 text-emerald-700',
   '部分保留': 'bg-amber-50 border-amber-200 text-amber-700',
   '待改期': 'bg-orange-50 border-orange-200 text-orange-700',
   '停课': 'bg-red-50 border-red-200 text-red-700',
 }
 
-const effectIcons: Record<string, typeof ShieldCheck> = {
+const effectDisplayIcons: Record<string, typeof ShieldCheck> = {
   '保留': ShieldCheck,
   '部分保留': Info,
   '待改期': AlertTriangle,
   '停课': XCircle,
+}
+
+const getEffectDisplay = (effect: WarningCourseEffect): { label: string; category: '保留' | '部分保留' | '待改期' | '停课' } => {
+  const { handlingType, newStatus } = effect
+
+  if (handlingType === '保留(岸上课)') {
+    if (newStatus === '正常') {
+      return { label: '保留', category: '保留' }
+    } else if (newStatus === '部分保留') {
+      return { label: '部分保留', category: '部分保留' }
+    }
+    return { label: '保留', category: '保留' }
+  }
+
+  if (handlingType === '改期(水上课)') {
+    return { label: '待改期', category: '待改期' }
+  }
+
+  if (handlingType === '停课') {
+    return { label: '停课', category: '停课' }
+  }
+
+  return { label: newStatus, category: '待改期' }
 }
 
 export default function WarningManagement() {
@@ -56,16 +79,18 @@ export default function WarningManagement() {
     setSeverity('中')
   }
 
-  const getAffectedCourses = (areaId: string) => courses.filter(c => c.waterAreaId === areaId && (c.status === '正常' || c.status === '待改期'))
+  const getAffectedCourses = (areaId: string) => courses.filter(c => c.waterAreaId === areaId && (c.status === '正常' || c.status === '待改期' || c.status === '部分保留'))
 
   const countCourseEffects = (effects?: WarningCourseEffect[]) => {
-    if (!effects) return { keep: 0, partial: 0, reschedule: 0, cancel: 0 }
-    return {
-      keep: effects.filter(e => e.effect === '保留').length,
-      partial: effects.filter(e => e.effect === '部分保留').length,
-      reschedule: effects.filter(e => e.effect === '待改期').length,
-      cancel: effects.filter(e => e.effect === '停课').length,
-    }
+    if (!effects || effects.length === 0) return { keep: 0, partial: 0, reschedule: 0, cancel: 0 }
+    return effects.reduce((acc, effect) => {
+      const { category } = getEffectDisplay(effect)
+      if (category === '保留') acc.keep += 1
+      else if (category === '部分保留') acc.partial += 1
+      else if (category === '待改期') acc.reschedule += 1
+      else if (category === '停课') acc.cancel += 1
+      return acc
+    }, { keep: 0, partial: 0, reschedule: 0, cancel: 0 })
   }
 
   return (
@@ -356,7 +381,8 @@ export default function WarningManagement() {
                           {w.affectedCourses.map((effect, i) => {
                             const course = courses.find(c => c.id === effect.courseId)
                             const coach = course ? coaches.find(c => c.id === course.coachId) : null
-                            const EffectIcon = effectIcons[effect.effect] || Info
+                            const { label, category } = getEffectDisplay(effect)
+                            const EffectIcon = effectDisplayIcons[category] || Info
                             return (
                               <div key={i} className="grid grid-cols-6 gap-4 px-4 py-3 items-center hover:bg-slate-50 transition-colors">
                                 <div className="col-span-2">
@@ -376,19 +402,19 @@ export default function WarningManagement() {
                                   )}
                                   {course?.courseType === '体验营' && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-violet-50 text-violet-600">
-                                      体验营
+                                      <Users className="w-3 h-3" />体验营
                                     </span>
                                   )}
                                   {course?.courseType === '组合课' && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-600">
-                                      组合课 {course?.shoreLessonProportion}%岸上
+                                      组合课 {course?.shoreLessonProportion !== undefined ? `${Math.round(course.shoreLessonProportion * 100)}%岸上` : ''}
                                     </span>
                                   )}
                                 </div>
                                 <div>
-                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${effectColors[effect.effect]}`}>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium border ${effectDisplayColors[category] || effectDisplayColors['待改期']}`}>
                                     <EffectIcon className="w-3 h-3" />
-                                    {effect.effect}
+                                    {label}
                                   </span>
                                 </div>
                                 <div className="col-span-2">
