@@ -134,7 +134,7 @@ export interface CalculationDetail {
 }
 
 export interface CalculationAdjustment {
-  type: '课时费' | '改期费' | '取消费' | '换人费' | '家庭优惠' | '组合折扣' | '岸上保留'
+  type: '课时费' | '改期费' | '取消费' | '换人费' | '家庭优惠' | '组合折扣' | '岸上保留' | '归还'
   amount: number
   description: string
 }

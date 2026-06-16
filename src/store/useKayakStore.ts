@@ -431,14 +431,14 @@ export const useKayakStore = create<KayakState>()(
         if (isStarted) {
           adjustments.push({
             type: '取消费',
-            amount: booking.totalLessonCost,
-            description: '课程已开始，取消全额扣课时',
+            amount: 0,
+            description: `课程已开始取消，预约时已扣${booking.totalLessonCost}课时不予归还`,
           })
           return {
             originalCost: booking.totalLessonCost,
             adjustments,
-            finalCost: booking.totalLessonCost,
-            explanation: `课程已开始取消：扣${booking.totalLessonCost}课时`,
+            finalCost: 0,
+            explanation: `课程已开始取消，预约时已扣${booking.totalLessonCost}课时不予归还`,
           }
         }
 
@@ -469,7 +469,7 @@ export const useKayakStore = create<KayakState>()(
         return {
           originalCost: booking.totalLessonCost,
           adjustments,
-          finalCost: 0,
+          finalCost: -booking.totalLessonCost,
           explanation: `课程未开始取消：归还${booking.totalLessonCost}课时`,
         }
       },
@@ -487,18 +487,13 @@ export const useKayakStore = create<KayakState>()(
 
         if (isStarted) {
           booking.participants.forEach(p => {
-            const share = Math.ceil(booking.totalLessonCost / booking.participants.length)
-            const sIdx = newStudents.findIndex(st => st.id === p.studentId)
-            if (sIdx >= 0) {
-              newStudents[sIdx] = { ...newStudents[sIdx], usedLessons: newStudents[sIdx].usedLessons + share }
-            }
             newTransactions.push({
               id: generateId('tx'),
               studentId: p.studentId,
               type: '取消扣费',
-              amount: share,
+              amount: 0,
               bookingId,
-              reason: `课程开始后取消，扣减${share}课时`,
+              reason: `课程已开始取消，预约时已扣${booking.totalLessonCost}课时不予归还`,
               createdAt: new Date().toISOString(),
               calculationDetail,
             })

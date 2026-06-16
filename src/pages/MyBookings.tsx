@@ -365,7 +365,7 @@ export default function MyBookings() {
                 className="w-full px-4 py-3 rounded-lg border border-red-200 bg-red-50 text-sm text-left hover:bg-red-100 transition-colors"
               >
                 <span className="font-medium text-red-700">课程开始后取消</span>
-                <span className="block text-xs text-red-500 mt-0.5">⚠️ 扣减部分课时（因预警保留的岸上课除外）</span>
+                <span className="block text-xs text-red-500 mt-0.5">⚠️ 课时已在预约时扣减，取消后不予归还</span>
               </button>
             </div>
             <button onClick={() => setShowCancelConfirm(null)} className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">

@@ -10,6 +10,8 @@ const typeColors: Record<TransactionType, string> = {
   '冻结': 'text-sky-600',
   '解冻': 'text-sky-500',
   '归还': 'text-emerald-500',
+  '改期扣费': 'text-red-600',
+  '换人扣费': 'text-red-600',
 }
 
 const typeBg: Record<TransactionType, string> = {
@@ -19,6 +21,8 @@ const typeBg: Record<TransactionType, string> = {
   '冻结': 'bg-sky-50',
   '解冻': 'bg-sky-50',
   '归还': 'bg-emerald-50',
+  '改期扣费': 'bg-red-50',
+  '换人扣费': 'bg-red-50',
 }
 
 export default function LessonManagement() {
@@ -150,9 +154,13 @@ export default function LessonManagement() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className={`text-sm font-bold ${tx.type === '充值' || tx.type === '归还' || tx.type === '解冻' ? 'text-emerald-600' : 'text-red-600'}`}>
-                        {tx.type === '充值' || tx.type === '归还' || tx.type === '解冻' ? '+' : '-'}{tx.amount}
-                      </span>
+                      {tx.type === '取消扣费' && tx.amount === 0 ? (
+                        <span className="text-sm font-bold text-red-600">不予归还</span>
+                      ) : (
+                        <span className={`text-sm font-bold ${tx.type === '充值' || tx.type === '归还' || tx.type === '解冻' ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {tx.type === '充值' || tx.type === '归还' || tx.type === '解冻' ? '+' : '-'}{tx.amount}
+                        </span>
+                      )}
                       <p className="text-xs text-slate-400 mt-0.5">{tx.createdAt.slice(0, 16).replace('T', ' ')}</p>
                     </div>
                   </div>
